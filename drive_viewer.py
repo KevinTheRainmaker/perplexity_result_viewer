@@ -59,10 +59,23 @@ GOOGLE_CLIENT_ID = st.secrets.get("GOOGLE_CLIENT_ID", "") if hasattr(st, 'secret
 GOOGLE_CLIENT_SECRET = st.secrets.get("GOOGLE_CLIENT_SECRET", "") if hasattr(st, 'secrets') else os.environ.get("GOOGLE_CLIENT_SECRET", "")
 
 # REDIRECT_URI 자동 감지
+def is_streamlit_cloud():
+    """Streamlit Cloud 환경인지 감지"""
+    # Streamlit Cloud에서는 HOSTNAME이 streamlit 관련 값으로 설정됨
+    hostname = os.environ.get("HOSTNAME", "")
+    # 여러 환경 변수 체크
+    return (
+        os.environ.get("STREAMLIT_SHARING_MODE") or 
+        os.environ.get("IS_STREAMLIT_CLOUD") or
+        "streamlit" in hostname.lower() or
+        os.path.exists("/mount/src")  # Streamlit Cloud의 특징적인 경로
+    )
+
+
 def get_redirect_uri():
     """환경에 따라 리디렉트 URI 자동 결정"""
     # Streamlit Cloud 환경 감지
-    if os.environ.get("STREAMLIT_SHARING_MODE") or os.environ.get("IS_STREAMLIT_CLOUD"):
+    if is_streamlit_cloud():
         return st.secrets.get("REDIRECT_URI_CLOUD", "https://perplexity-viewer.streamlit.app")
     # secrets.toml에서 로드
     if hasattr(st, 'secrets') and "REDIRECT_URI" in st.secrets:
