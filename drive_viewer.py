@@ -227,6 +227,21 @@ def group_files_by_source(files):
     return dict(groups)
 
 
+def group_files_by_source_upload(files):
+    """업로드된 파일 객체를 소스 파일명별로 그룹화"""
+    groups = defaultdict(lambda: {'paragraph': None, 'sentence': None})
+    
+    for file in files:
+        parsed = parse_filename(file['name'])
+        if parsed:
+            key = f"{parsed['source']}_{parsed['tokens']}"
+            groups[key][parsed['type']] = file
+            groups[key]['source'] = parsed['source']
+            groups[key]['tokens'] = parsed['tokens']
+    
+    return dict(groups)
+
+
 def display_dataframe_with_features(df, key_prefix):
     """DataFrame을 검색, 정렬, 필터링 기능과 함께 표시"""
     
@@ -288,36 +303,36 @@ def display_dataframe_with_features(df, key_prefix):
 
 
 def local_mode():
-    """로컬 파일 시스템 모드"""
-    st.sidebar.markdown(f"### {icon('folder-open')} 로컬 폴더 설정", unsafe_allow_html=True)
+    """로컬 파일 업로드 모드"""
+    st.sidebar.markdown(f"### {icon('upload-simple')} 파일 업로드", unsafe_allow_html=True)
     
-    folder_path = st.sidebar.text_input(
-        "결과 폴더 경로",
-        value="./results/tables",
-        help="CSV 파일이 저장된 폴더 경로"
+    uploaded_files = st.sidebar.file_uploader(
+        "CSV 파일 업로드",
+        type=['csv'],
+        accept_multiple_files=True,
+        help="Perplexity 분석 결과 CSV 파일을 업로드하세요"
     )
     
-    if not os.path.exists(folder_path):
-        st.warning(f"폴더를 찾을 수 없습니다: {folder_path}")
+    if not uploaded_files:
+        st.info("CSV 파일을 업로드하세요.")
+        st.markdown("""
+        **지원 파일 형식:**
+        - `{파일명}_paragraph_{토큰수}.csv` - 문단 단위 분석 결과
+        - `{파일명}_sentence_{토큰수}.csv` - 문장 단위 분석 결과
+        """)
         return
     
-    # CSV 파일 목록 가져오기
+    # 업로드된 파일을 딕셔너리로 변환
     csv_files = []
-    for filename in os.listdir(folder_path):
-        if filename.endswith('.csv'):
-            filepath = os.path.join(folder_path, filename)
-            csv_files.append({
-                'name': filename,
-                'path': filepath,
-                'size': os.path.getsize(filepath)
-            })
-    
-    if not csv_files:
-        st.info("CSV 파일이 없습니다.")
-        return
+    for uploaded_file in uploaded_files:
+        csv_files.append({
+            'name': uploaded_file.name,
+            'file': uploaded_file,  # 파일 객체 저장
+            'size': uploaded_file.size
+        })
     
     # 파일 그룹화
-    groups = group_files_by_source(csv_files)
+    groups = group_files_by_source_upload(csv_files)
     
     if not groups:
         st.warning("파일명 패턴이 맞는 CSV 파일이 없습니다.")
@@ -342,14 +357,14 @@ def local_mode():
         
         with tab1:
             if group['paragraph']:
-                df_para = pd.read_csv(group['paragraph']['path'])
+                df_para = pd.read_csv(group['paragraph']['file'])
                 display_dataframe_with_features(df_para, f"{selected_source}_para")
             else:
                 st.info("문단 데이터가 없습니다.")
         
         with tab2:
             if group['sentence']:
-                df_sent = pd.read_csv(group['sentence']['path'])
+                df_sent = pd.read_csv(group['sentence']['file'])
                 display_dataframe_with_features(df_sent, f"{selected_source}_sent")
             else:
                 st.info("문장 데이터가 없습니다.")
